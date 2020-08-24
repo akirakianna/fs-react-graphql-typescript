@@ -1,0 +1,1 @@
+# fs-react-graphql-typescript
