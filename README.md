@@ -22,3 +22,5 @@ Playground (devtool) - GraphQL - TypeScript
 crud - reading a post, updating a post, deleting a post etc.
 
 GraphQL splits queries and mutations so have to specify mutation on playground..
+
+Need to be explicit with types when using nullable 
