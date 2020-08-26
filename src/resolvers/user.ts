@@ -1,4 +1,4 @@
-import { Resolver, Mutation, InputType, Field, Arg, Ctx, ObjectType } from 'type-graphql'
+import { Resolver, Mutation, InputType, Field, Arg, Ctx, ObjectType, Query } from 'type-graphql'
 import { User } from '../entities/User'
 import { MyContext } from 'src/types'
 import argon2 from 'argon2'
@@ -22,7 +22,6 @@ class FieldError {
   message: string
 }
 
-
 @ObjectType()
 class UserResponse {
   @Field(() => [FieldError], { nullable: true })
@@ -34,25 +33,72 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
-  @Mutation(() => User)
+  @Query(() => User, { nullable: true })
+  async me(
+    @Ctx() { req, em }: MyContext
+  ) {
+    // User is not logged in
+    if (!req.session.userId) {
+      return null
+    }
+    const user = await em.findOne(User, { id: req.session.userId })
+    return user
+  }
+
+  @Mutation(() => UserResponse)
   async register(
     @Arg('options') options: UsernamePasswordInput,
     @Ctx() { em }: MyContext
-  ) {
+    //! Adding custom validation
+  ): Promise<UserResponse> {
+    if (options.username.length <= 2) {
+      return {
+        errors: [
+          {
+            field: "username",
+            message: "Username length must be greater than 2 characters."
+          }
+        ]
+      }
+    }
+    if (options.password.length <= 3) {
+      return {
+        errors: [
+          {
+            field: "password",
+            message: "Password length must be greater than 3 characters."
+          }
+        ]
+      }
+    }
     const hashedPassword = await argon2.hash(options.password)
     const user = em.create(User, {
       username: options.username,
       password: hashedPassword
     })
+    try {
     //* This is saving the user to the db
     await em.persistAndFlush(user)
-    return user
+    } catch(err) {
+      //* username duplication error handling
+      if (err.code === '23505') {
+        return {
+          errors: [
+            {
+            field: 'username',
+            message: 'Username is already taken!'
+          }
+        ]
+      }
+    } 
   }
+  return { user } 
+}
 
   @Mutation(() => UserResponse)
   async login(
     @Arg('options') options: UsernamePasswordInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     const user = await em.findOne(User, { username: options.username })
     if (!user) {
@@ -60,7 +106,7 @@ export class UserResolver {
         errors: [
           {
             field: 'username',
-            message: 'That username does not exist'
+            message: 'That username does not exist.'
           }
         ]
       }
@@ -71,11 +117,14 @@ export class UserResolver {
         errors: [
           {
             field: 'password',
-            message: 'Incorrect password'
+            message: 'Incorrect password!'
           }
         ]
       }
     }
+    
+    req.session.userId = user.id
+
     return {
       user
     }
