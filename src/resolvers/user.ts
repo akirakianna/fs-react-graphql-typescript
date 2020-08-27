@@ -37,6 +37,7 @@ export class UserResolver {
   async me(
     @Ctx() { req, em }: MyContext
   ) {
+    console.log('Session: ', req.session)
     // User is not logged in
     if (!req.session.userId) {
       return null
@@ -48,7 +49,7 @@ export class UserResolver {
   @Mutation(() => UserResponse)
   async register(
     @Arg('options') options: UsernamePasswordInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
     //! Adding custom validation
   ): Promise<UserResponse> {
     if (options.username.length <= 2) {
@@ -92,6 +93,9 @@ export class UserResolver {
       }
     } 
   }
+  // Store user id session
+  // This sets a cookie on the user and keeps them logged in
+  req.session.userId = user.id
   return { user } 
 }
 
