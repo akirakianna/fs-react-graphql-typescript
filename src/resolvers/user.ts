@@ -81,6 +81,7 @@ export class UserResolver {
     //* This is saving the user to the db
     await em.persistAndFlush(user)
     } catch(err) {
+      console.log(err)
       //* username duplication error handling
       if (err.code === '23505') {
         return {

@@ -109,6 +109,7 @@ let UserResolver = class UserResolver {
                 yield em.persistAndFlush(user);
             }
             catch (err) {
+                console.log(err);
                 if (err.code === '23505') {
                     return {
                         errors: [
