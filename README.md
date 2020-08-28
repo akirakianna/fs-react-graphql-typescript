@@ -73,9 +73,30 @@ In next.js whatever you call your pages file name, automatically becomes a route
 
 2.55 for colormode changes
 
+// BUG
 
+server side bug
 
+Bug where if you eneter a username that's already taken, the next time you enter a username it doesn't work..
+error with persistandflush - ValidationError: You cannot call em.flush() from inside lifecycle hook handlers
+fixed by re-writing with a query builder - user.ts register mutation
 
-
-
+before 
+ try {
+    //* This is saving the user to the db
+    await em.persistAndFlush(user)
+    } catch(err) {
+      console.log(err)
+      //* username duplication error handling
+      if (err.code === '23505') {
+        return {
+          errors: [
+            {
+            field: 'username',
+            message: 'Username is already taken!'
+          }
+        ]
+      }
+    } 
+  }
 

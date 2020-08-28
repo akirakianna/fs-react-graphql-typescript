@@ -2,6 +2,7 @@ import { Resolver, Mutation, InputType, Field, Arg, Ctx, ObjectType, Query } fro
 import { User } from '../entities/User'
 import { MyContext } from 'src/types'
 import argon2 from 'argon2'
+import { EntityManager } from '@mikro-orm/postgresql'
 
 //* A different way of writing resolver 1.18
 //* Inputs can be reused - e.g same ones for register and login
@@ -73,32 +74,43 @@ export class UserResolver {
       }
     }
     const hashedPassword = await argon2.hash(options.password)
-    const user = em.create(User, {
-      username: options.username,
-      password: hashedPassword
-    })
+    let user
     try {
-    //* This is saving the user to the db
-    await em.persistAndFlush(user)
-    } catch(err) {
+      //! Using Knex instead of MikroORM here to build a query due to em.flush() error.
+      //* Saving user to DB.
+      //* I called it createdAt, updatedAt but MikroOrm adds underscores
+      //* Knex doesn't know about this, so have to add them in here so it knows what the column 
+      //* name is in the db.
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert(
+          {
+            username: options.username,
+            password: hashedPassword,
+            created_at: new Date(),
+            updated_at: new Date()
+          }).returning('*')
+      user = result[0]
+    } catch (err) {
       console.log(err)
       //* username duplication error handling
       if (err.code === '23505') {
         return {
           errors: [
             {
-            field: 'username',
-            message: 'Username is already taken!'
-          }
-        ]
+              field: 'username',
+              message: 'Username is already taken!'
+            }
+          ]
+        }
       }
-    } 
+    }
+    // Store user id session
+    // This sets a cookie on the user and keeps them logged in
+    req.session.userId = user.id
+    return { user }
   }
-  // Store user id session
-  // This sets a cookie on the user and keeps them logged in
-  req.session.userId = user.id
-  return { user } 
-}
 
   @Mutation(() => UserResponse)
   async login(
@@ -127,7 +139,7 @@ export class UserResolver {
         ]
       }
     }
-    
+
     req.session.userId = user.id
 
     return {
