@@ -3,6 +3,7 @@ import { User } from '../entities/User'
 import { MyContext } from 'src/types'
 import argon2 from 'argon2'
 import { EntityManager } from '@mikro-orm/postgresql'
+import { COOKIE_NAME } from '../constants'
 
 //* A different way of writing resolver 1.18
 //* Inputs can be reused - e.g same ones for register and login
@@ -145,5 +146,28 @@ export class UserResolver {
     return {
       user
     }
+  }
+
+ 
+  @Mutation(() => Boolean)
+  logout(
+    // *The destroy func. will remove the session from Redis.
+    //! To also clear the cookie, add res object and use clearCookie function with cookie name.
+    @Ctx() {req, res}: MyContext
+  ) {
+     // The resolver will wait for the promise to finish, then wait for the callback to finish.
+    return new Promise((resolve) =>
+    req.session.destroy((err) => {
+      //! If only want to destro cookie once successfully logged out move down to resolve(true)
+      res.clearCookie(COOKIE_NAME)
+      // If there is a problem trying to destroy the session
+      // console.log to see what the issue is
+      if (err) {
+        console.log(err)
+        resolve(false)
+        return
+      }
+      resolve(true)
+    }))
   }
 }

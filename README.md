@@ -105,4 +105,9 @@ before
 Due to cacheing it didn't automatically update to show the right links in navbar when logging in, had to refresh page.
 Urql is using caching, caching the me request - saw `i wasn't logged in and didn't make another network erequest. just took the data from the cache which said I wasn't logged in.
 to fix this I updated the cache on login and register by ...
-urql doesn't come with default normalized cache - set up in separate package - using graphcache.
+urql doesn't come with default normalized cache - set up in separate package - using graphcache. See notes in _app.tsx.
+
+--- fragments ---
+
+Created a base user fragment so that I don't have to repeat fields in my graphql files -
+can just use ...BaseUser. Also means can add more fields to fragment and won't need to do it in all files with user
