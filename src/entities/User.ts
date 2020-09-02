@@ -20,6 +20,10 @@ export class User {
   @Property({ type: 'text', unique: true })
   username!: string
 
+  @Field()
+  @Property({ type: 'text', unique: true })
+  email!: string
+
   //* By removing @Field means it can't be selected, will be a hash pw and only being created as a db column.
   @Property({ type: 'text', })
   password!: string

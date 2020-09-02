@@ -33,6 +33,6 @@
   ],
   "include": [
     "./src/**/*.tsx",
-    "./src/**/*.ts"
+    "./src/**/*.ts", "../clreddit-web/src/utils2/sleep.ts"
   ]
 }

@@ -1,20 +1,11 @@
-import { Resolver, Mutation, InputType, Field, Arg, Ctx, ObjectType, Query } from 'type-graphql'
+import { Resolver, Mutation, Field, Arg, Ctx, ObjectType, Query } from 'type-graphql'
 import { User } from '../entities/User'
 import { MyContext } from 'src/types'
 import argon2 from 'argon2'
 import { EntityManager } from '@mikro-orm/postgresql'
 import { COOKIE_NAME } from '../constants'
-
-//* A different way of writing resolver 1.18
-//* Inputs can be reused - e.g same ones for register and login
-@InputType()
-class UsernamePasswordInput {
-  @Field()
-  username: string
-
-  @Field()
-  password: string
-}
+import { UsernamePasswordInput } from './UsernamePasswordInput'
+import { validateRegister } from '../utils/validateRegister'
 
 @ObjectType()
 class FieldError {
@@ -35,11 +26,19 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+  @Mutation(() => Boolean)
+  async forgotPassword(
+    @Arg('email') email: string,
+    @Ctx() { em }: MyContext
+  ) {
+    // const user = await em.findOne(User, { email })
+    return true
+  }
+
   @Query(() => User, { nullable: true })
   async me(
     @Ctx() { req, em }: MyContext
   ) {
-    console.log('Session: ', req.session)
     // User is not logged in
     if (!req.session.userId) {
       return null
@@ -52,28 +51,13 @@ export class UserResolver {
   async register(
     @Arg('options') options: UsernamePasswordInput,
     @Ctx() { em, req }: MyContext
-    //! Adding custom validation
+   
   ): Promise<UserResponse> {
-    if (options.username.length <= 2) {
-      return {
-        errors: [
-          {
-            field: "username",
-            message: "Username length must be greater than 2 characters."
-          }
-        ]
-      }
+    const errors = validateRegister(options)
+    if (errors) {
+      return { errors }
     }
-    if (options.password.length <= 3) {
-      return {
-        errors: [
-          {
-            field: "password",
-            message: "Password length must be greater than 3 characters."
-          }
-        ]
-      }
-    }
+
     const hashedPassword = await argon2.hash(options.password)
     let user
     try {
@@ -85,13 +69,14 @@ export class UserResolver {
       const result = await (em as EntityManager)
         .createQueryBuilder(User)
         .getKnexQuery()
-        .insert(
-          {
-            username: options.username,
-            password: hashedPassword,
-            created_at: new Date(),
-            updated_at: new Date()
-          }).returning('*')
+        .insert({
+          username: options.username,
+          email: options.email,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+        .returning('*')
       user = result[0]
     } catch (err) {
       console.log(err)
@@ -115,21 +100,26 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async login(
-    @Arg('options') options: UsernamePasswordInput,
+    @Arg('usernameOrEmail') usernameOrEmail: string,
+    @Arg('password') password: string,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    const user = await em.findOne(User, { username: options.username })
+    //* Conditionally finding a user, depending on whether there is an @ present.
+    const user = await em.findOne(User, usernameOrEmail.includes('@')
+      ? { email: usernameOrEmail }
+      : { username: usernameOrEmail }
+    )
     if (!user) {
       return {
         errors: [
           {
-            field: 'username',
+            field: 'usernameOrEmail',
             message: 'That username does not exist.'
           }
         ]
       }
     }
-    const valid = await argon2.verify(user.password, options.password)
+    const valid = await argon2.verify(user.password, password)
     if (!valid) {
       return {
         errors: [
@@ -148,26 +138,25 @@ export class UserResolver {
     }
   }
 
- 
   @Mutation(() => Boolean)
   logout(
     // *The destroy func. will remove the session from Redis.
     //! To also clear the cookie, add res object and use clearCookie function with cookie name.
-    @Ctx() {req, res}: MyContext
+    @Ctx() { req, res }: MyContext
   ) {
-     // The resolver will wait for the promise to finish, then wait for the callback to finish.
+    // The resolver will wait for the promise to finish, then wait for the callback to finish.
     return new Promise((resolve) =>
-    req.session.destroy((err) => {
-      //! If only want to destro cookie once successfully logged out move down to resolve(true)
-      res.clearCookie(COOKIE_NAME)
-      // If there is a problem trying to destroy the session
-      // console.log to see what the issue is
-      if (err) {
-        console.log(err)
-        resolve(false)
-        return
-      }
-      resolve(true)
-    }))
+      req.session.destroy((err) => {
+        //! If only want to destro cookie once successfully logged out move down to resolve(true)
+        res.clearCookie(COOKIE_NAME)
+        // If there is a problem trying to destroy the session
+        // console.log to see what the issue is
+        if (err) {
+          console.log(err)
+          resolve(false)
+          return
+        }
+        resolve(true)
+      }))
   }
 }

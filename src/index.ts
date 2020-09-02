@@ -12,12 +12,17 @@ import redis from 'redis'
 import session from 'express-session'
 import connectRedis from 'connect-redis'
 import cors from 'cors'
+import { sendEmail } from './utils/sendEmail'
+import { User } from './entities/User'
 
 //* MikroORM setup.
 
 const main = async () => {
+  // //* When server starts send test email
+  // sendEmail("kianna@kianna.com", "hello")
   //!Connect to the db
   const orm = await MikroORM.init(mikroConfig)
+  orm.em.nativeDelete(User, {})
   //! Run migrations
   await orm.getMigrator().up()
   //! Run SQL
