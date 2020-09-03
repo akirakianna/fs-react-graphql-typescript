@@ -3,9 +3,11 @@ import { User } from '../entities/User'
 import { MyContext } from 'src/types'
 import argon2 from 'argon2'
 import { EntityManager } from '@mikro-orm/postgresql'
-import { COOKIE_NAME } from '../constants'
+import { COOKIE_NAME, FORGOT_PW_PREFIX } from '../constants'
 import { UsernamePasswordInput } from './UsernamePasswordInput'
 import { validateRegister } from '../utils/validateRegister'
+import { sendEmail } from '../utils/sendEmail'
+import { v4 } from 'uuid'
 
 @ObjectType()
 class FieldError {
@@ -26,12 +28,39 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+
+  @Mutation(() => {})
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg('email') email: string,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, redis }: MyContext
   ) {
-    // const user = await em.findOne(User, { email })
+    // check if user exists
+    const user = await em.findOne(User, { email })
+    if (!user) {
+      // the email is not in the db
+      // you don't want to highlight if that email is not in the db, so can return true instead of false
+      return true
+    }
+    
+    //uuid generates a random & unique string 
+    //! 1. Creating token
+    const token = v4()
+    
+    //specify key
+    await redis.set(
+      //! 2. Storing the token in Redis
+      FORGOT_PW_PREFIX + token, 
+      //! 4. Will look up the value to get the user id
+      user.id, 
+      'ex', 
+      1000 * 60 * 60 * 24 * 3
+    ) // 3 days to reset your pw
+    //! 3. Whenever the user changes their pw, the token will be sent back to us here
+    await sendEmail(
+      email,
+      `<a href="http://localhost:3000/change-password/${token}">Reset password</a>`
+    )
     return true
   }
 
@@ -51,7 +80,7 @@ export class UserResolver {
   async register(
     @Arg('options') options: UsernamePasswordInput,
     @Ctx() { em, req }: MyContext
-   
+
   ): Promise<UserResponse> {
     const errors = validateRegister(options)
     if (errors) {

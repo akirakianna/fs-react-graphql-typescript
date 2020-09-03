@@ -20,7 +20,10 @@ function sendEmail(to, html) {
             host: "smtp.ethereal.email",
             port: 587,
             secure: false,
-            auth: {},
+            auth: {
+                user: 'f555b6lwz7pmokr2@ethereal.email',
+                pass: 'CHa3DTqS3XHJ6TMDcq',
+            },
         });
         let info = yield transporter.sendMail({
             from: '"Fred Foo 👻" <foo@example.com>',

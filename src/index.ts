@@ -8,7 +8,7 @@ import { buildSchema } from "type-graphql"
 import { HelloResolver } from './resolvers/hello'
 import { PostResolver } from './resolvers/post'
 import { UserResolver } from './resolvers/user'
-import redis from 'redis'
+import Redis from 'ioredis'
 import session from 'express-session'
 import connectRedis from 'connect-redis'
 import cors from 'cors'
@@ -22,7 +22,7 @@ const main = async () => {
   // sendEmail("kianna@kianna.com", "hello")
   //!Connect to the db
   const orm = await MikroORM.init(mikroConfig)
-  orm.em.nativeDelete(User, {})
+  // orm.em.nativeDelete(User, {})
   //! Run migrations
   await orm.getMigrator().up()
   //! Run SQL
@@ -41,7 +41,7 @@ const main = async () => {
   //* Order matters - goes between app and middleware. The order that you add Express middleware is the order they will run.
   //! Important because I will be using the session middleware inside of the apollo middleware.
   const RedisStore = connectRedis(session)
-  const redisClient = redis.createClient()
+  const redis = new Redis()
   app.use(cors({
     origin: 'http://localhost:3000',
     credentials: true
@@ -51,7 +51,7 @@ const main = async () => {
     session({
       name: COOKIE_NAME,
       store: new RedisStore({
-        client: redisClient,
+        client: redis,
         //! Can change this (connect-redis doc) to set an expiry time
         disableTouch: true
       }),
@@ -74,7 +74,7 @@ const main = async () => {
       validate: false
     }),
     //* context is a special obj which is avalable to all of the resolvers.
-    context: ({ req, res }) => ({ em: orm.em, req, res })
+    context: ({ req, res }) => ({ em: orm.em, req, res, redis })
   })
 
   apolloServer.applyMiddleware({
