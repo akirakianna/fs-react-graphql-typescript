@@ -28,8 +28,58 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+  @Mutation(() => UserResponse)
+  async changePassword(
+    @Arg('token') token: string,
+    @Arg('newPassword') newPassword: string,
+    @Ctx() { redis, em, req }: MyContext
+  ): Promise<UserResponse> {
+    if (newPassword.length <= 3) {
+      return {
+        errors: [
+          {
+            field: 'newPassword',
+            message: 'Password length must be greater than 3 characters.'
+          }
+        ]
+      }
+    }
 
-  @Mutation(() => {})
+    const userId = await redis.get(FORGOT_PW_PREFIX + token)
+    if (!userId) {
+      return {
+        errors: [
+          {
+            field: 'token',
+            message: 'Token is invalid or expired.'
+          }
+        ]
+      }
+    }
+
+    const user = await em.findOne(User, { id: parseInt(userId) })
+
+    if (!user) {
+      return {
+        errors: [
+          {
+            field: 'token',
+            message: 'User no longer exists.'
+          }
+        ]
+      }
+    }
+    
+    //* Updating user with new pw and saving to db.
+    user.password = await argon2.hash(newPassword)
+    await em.persistAndFlush(user)
+
+    //* Auto login user once updated/ changed pw.
+    req.session.userId = user.id
+
+    return { user }
+  }
+
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg('email') email: string,
@@ -42,18 +92,18 @@ export class UserResolver {
       // you don't want to highlight if that email is not in the db, so can return true instead of false
       return true
     }
-    
+
     //uuid generates a random & unique string 
     //! 1. Creating token
     const token = v4()
-    
+
     //specify key
     await redis.set(
       //! 2. Storing the token in Redis
-      FORGOT_PW_PREFIX + token, 
+      FORGOT_PW_PREFIX + token,
       //! 4. Will look up the value to get the user id
-      user.id, 
-      'ex', 
+      user.id,
+      'ex',
       1000 * 60 * 60 * 24 * 3
     ) // 3 days to reset your pw
     //! 3. Whenever the user changes their pw, the token will be sent back to us here

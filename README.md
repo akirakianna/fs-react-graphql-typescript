@@ -111,7 +111,11 @@ urql doesn't come with default normalized cache - set up in separate package - u
 
 Created a base user fragment so that I don't have to repeat fields in my graphql files -
 can just use ...BaseUser. Also means can add more fields to fragment and won't need to do it in all files with user
+Base error fragment used in reg login changepw
 
+You can layer fragments on top of one another, 
+eg created a Base user response fragment to house ... fragments as they are all user response types?/ user responses.
+See user.ts file.
 
 --- server side rendering ---
 sleep function in post.ts (post resolver) creating artifical delay
