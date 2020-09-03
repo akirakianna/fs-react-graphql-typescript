@@ -44,14 +44,15 @@ export class UserResolver {
         ]
       }
     }
-
-    const userId = await redis.get(FORGOT_PW_PREFIX + token)
+    
+    const key  = FORGOT_PW_PREFIX + token
+    const userId = await redis.get(key)
     if (!userId) {
       return {
         errors: [
           {
             field: 'token',
-            message: 'Token is invalid or expired.'
+            message: 'Token is invalid or has expired.'
           }
         ]
       }
@@ -73,7 +74,10 @@ export class UserResolver {
     //* Updating user with new pw and saving to db.
     user.password = await argon2.hash(newPassword)
     await em.persistAndFlush(user)
-
+    
+    //* deleting key so user cannot change pw again on the same token.
+    //* This is removing it from redis.
+    await redis.del(key)
     //* Auto login user once updated/ changed pw.
     req.session.userId = user.id
 
