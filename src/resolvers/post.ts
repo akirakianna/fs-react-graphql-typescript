@@ -1,6 +1,5 @@
-import { Resolver, Query, Ctx, Arg, Mutation } from 'type-graphql'
+import { Resolver, Query, Arg, Mutation } from 'type-graphql'
 import { Post } from '../entities/Post'
-import { MyContext } from 'src/types'
 
 //* CRUD through GraphQL *//
 
@@ -9,8 +8,8 @@ export class PostResolver {
 
   //* Return all posts
   @Query(() => [Post])
-  async posts(@Ctx() { em }: MyContext): Promise<Post[]> {
-    return em.find(Post, {})
+  async posts(): Promise<Post[]> {
+    return Post.find()
   }
 
   //* Get a single post by id
@@ -18,47 +17,39 @@ export class PostResolver {
   @Query(() => Post, { nullable: true })
   post(
     //! id is TypeScript type, GraphQL type is Int.
-    @Arg('id') id: number,
-    @Ctx() { em }: MyContext): Promise<Post | null> {
-    return em.findOne(Post, { id })
+    @Arg('id') id: number): Promise<Post | undefined> {
+    return Post.findOne(id)
   }
 
   //* Create a new post
   //!Mutation is for changing (changing on the server, e.g create, edit, delete)
   @Mutation(() => Post)
   async createPost(
-    @Arg('title') title: string,
-    @Ctx() { em }: MyContext): Promise<Post> {
-    const post = em.create(Post, { title })
-    await em.persistAndFlush(post)
-    return post
+    @Arg('title') title: string): Promise<Post> {
+      //* This is 2 SQL queries - 1 to save/ insert, the other to select it.
+    return Post.create({ title }).save()
   }
 
   //* Edit a post
   @Mutation(() => Post, { nullable: true })
   async updatePost(
     @Arg('id') id: number,
-    @Arg('title', () => String, { nullable: true }) title: string,
-    @Ctx() { em }: MyContext
+    @Arg('title', () => String, { nullable: true }) title: string
   ): Promise<Post | null> {
-    const post = await em.findOne(Post, { id })
+    const post = await Post.findOne(id)
     if (!post) {
       return null
     }
     if (typeof title !== 'undefined') {
-      post.title = title
-      await em.persistAndFlush(post)
+      await Post.update({ id }, { title })
     }
     return post
   }
 
   //* Delete a post
   @Mutation(() => Boolean)
-  async deletePost(
-    @Arg('id') id: number,
-    @Ctx() { em }: MyContext
-  ): Promise<boolean> {
-    await em.nativeDelete(Post, { id })
+  async deletePost(@Arg('id') id: number): Promise<boolean> {
+    await Post.delete(id)
     return true
   }
 }
