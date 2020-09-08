@@ -8,6 +8,7 @@ import { UsernamePasswordInput } from './UsernamePasswordInput'
 import { validateRegister } from '../utils/validateRegister'
 import { sendEmail } from '../utils/sendEmail'
 import { v4 } from 'uuid'
+import { getConnection } from 'typeorm'
 
 @ObjectType()
 class FieldError {
@@ -32,7 +33,7 @@ export class UserResolver {
   async changePassword(
     @Arg('token') token: string,
     @Arg('newPassword') newPassword: string,
-    @Ctx() { redis, em, req }: MyContext
+    @Ctx() { redis, req }: MyContext
   ): Promise<UserResponse> {
     if (newPassword.length <= 3) {
       return {
@@ -44,8 +45,8 @@ export class UserResolver {
         ]
       }
     }
-    
-    const key  = FORGOT_PW_PREFIX + token
+
+    const key = FORGOT_PW_PREFIX + token
     const userId = await redis.get(key)
     if (!userId) {
       return {
@@ -58,7 +59,8 @@ export class UserResolver {
       }
     }
 
-    const user = await em.findOne(User, { id: parseInt(userId) })
+    const userIdNum = parseInt(userId)
+    const user = await User.findOne(userIdNum)
 
     if (!user) {
       return {
@@ -70,11 +72,15 @@ export class UserResolver {
         ]
       }
     }
-    
+
     //* Updating user with new pw and saving to db.
-    user.password = await argon2.hash(newPassword)
-    await em.persistAndFlush(user)
-    
+    await User.update(
+      { id: userIdNum }, 
+      {
+      password: await argon2.hash(newPassword)
+      } 
+    )
+
     //* deleting key so user cannot change pw again on the same token.
     //* This is removing it from redis.
     await redis.del(key)
@@ -87,10 +93,11 @@ export class UserResolver {
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg('email') email: string,
-    @Ctx() { em, redis }: MyContext
+    @Ctx() { redis }: MyContext
   ) {
     // check if user exists
-    const user = await em.findOne(User, { email })
+    // if you want to search by a key that is not primary column, you have to use where
+    const user = await User.findOne({ where: { email } })
     if (!user) {
       // the email is not in the db
       // you don't want to highlight if that email is not in the db, so can return true instead of false
@@ -119,21 +126,20 @@ export class UserResolver {
   }
 
   @Query(() => User, { nullable: true })
-  async me(
-    @Ctx() { req, em }: MyContext
+  me(
+    @Ctx() { req }: MyContext
   ) {
     // User is not logged in
     if (!req.session.userId) {
       return null
     }
-    const user = await em.findOne(User, { id: req.session.userId })
-    return user
+    return User.findOne(req.session.userId)
   }
 
   @Mutation(() => UserResponse)
   async register(
     @Arg('options') options: UsernamePasswordInput,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { req }: MyContext
 
   ): Promise<UserResponse> {
     const errors = validateRegister(options)
@@ -144,23 +150,22 @@ export class UserResolver {
     const hashedPassword = await argon2.hash(options.password)
     let user
     try {
-      //! Using Knex instead of MikroORM here to build a query due to em.flush() error.
-      //* Saving user to DB.
-      //* I called it createdAt, updatedAt but MikroOrm adds underscores
-      //* Knex doesn't know about this, so have to add them in here so it knows what the column 
-      //* name is in the db.
-      const result = await (em as EntityManager)
-        .createQueryBuilder(User)
-        .getKnexQuery()
-        .insert({
-          username: options.username,
-          email: options.email,
-          password: hashedPassword,
-          created_at: new Date(),
-          updated_at: new Date()
-        })
-        .returning('*')
-      user = result[0]
+      //* Using TypeORM's query builder to insert a user and returning the user back.
+      const result = await getConnection()
+      .createQueryBuilder()
+      .insert()
+      .into(User)
+      .values(
+       {
+        username: options.username,
+        email: options.email,
+        password: hashedPassword,
+       }
+      )
+      .returning('*')
+      .execute()
+      //* first result returned from sql statement under raw, as using returning (*).
+      user = result.raw[0]
     } catch (err) {
       console.log(err)
       //* username duplication error handling
@@ -185,12 +190,12 @@ export class UserResolver {
   async login(
     @Arg('usernameOrEmail') usernameOrEmail: string,
     @Arg('password') password: string,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { req }: MyContext
   ): Promise<UserResponse> {
     //* Conditionally finding a user, depending on whether there is an @ present.
-    const user = await em.findOne(User, usernameOrEmail.includes('@')
-      ? { email: usernameOrEmail }
-      : { username: usernameOrEmail }
+    const user = await User.findOne(usernameOrEmail.includes('@')
+      ? { where: { email: usernameOrEmail } }
+      : { where: { username: usernameOrEmail } }
     )
     if (!user) {
       return {
@@ -243,3 +248,55 @@ export class UserResolver {
       }))
   }
 }
+
+
+// @Mutation(() => UserResponse)
+//   async register(
+//     @Arg('options') options: UsernamePasswordInput,
+//     @Ctx() { req }: MyContext
+
+//   ): Promise<UserResponse> {
+//     const errors = validateRegister(options)
+//     if (errors) {
+//       return { errors }
+//     }
+
+//     const hashedPassword = await argon2.hash(options.password)
+//     let user
+//     try {
+//       //! Using Knex instead of MikroORM here to build a query due to em.flush() error.
+//       //* Saving user to DB.
+//       //* I called it createdAt, updatedAt but MikroOrm adds underscores
+//       //* Knex doesn't know about this, so have to add them in here so it knows what the column 
+//       //* name is in the db.
+//       const result = await (em as EntityManager)
+//         .createQueryBuilder(User)
+//         .getKnexQuery()
+//         .insert({
+//           username: options.username,
+//           email: options.email,
+//           password: hashedPassword,
+//           created_at: new Date(),
+//           updated_at: new Date()
+//         })
+//         .returning('*')
+//       user = result[0]
+//     } catch (err) {
+//       console.log(err)
+//       //* username duplication error handling
+//       if (err.code === '23505') {
+//         return {
+//           errors: [
+//             {
+//               field: 'username',
+//               message: 'Username is already taken!'
+//             }
+//           ]
+//         }
+//       }
+//     }
+//     // Store user id session
+//     // This sets a cookie on the user and keeps them logged in
+//     req.session.userId = user.id
+//     return { user }
+//   }
