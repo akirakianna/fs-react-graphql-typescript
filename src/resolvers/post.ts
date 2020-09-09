@@ -1,7 +1,27 @@
-import { Resolver, Query, Arg, Mutation } from 'type-graphql'
+import {
+  Resolver,
+  Query,
+  Arg,
+  Mutation,
+  InputType,
+  Field,
+  Ctx,
+  UseMiddleware
+} from 'type-graphql'
 import { Post } from '../entities/Post'
+import { MyContext } from 'src/types'
+import { isAuth } from '../middleware/isAuth'
 
 //* CRUD through GraphQL *//
+
+// InputType handy to use when have multiple feilds for one query
+@InputType()
+class PostInput {
+  @Field()
+  title: string
+  @Field()
+  text: string
+}
 
 @Resolver()
 export class PostResolver {
@@ -16,7 +36,7 @@ export class PostResolver {
   //! Query is for getting data
   @Query(() => Post, { nullable: true })
   post(
-    //! id is TypeScript type, GraphQL type is Int.
+    //! id is TypeScript type
     @Arg('id') id: number): Promise<Post | undefined> {
     return Post.findOne(id)
   }
@@ -24,10 +44,16 @@ export class PostResolver {
   //* Create a new post
   //!Mutation is for changing (changing on the server, e.g create, edit, delete)
   @Mutation(() => Post)
+  //! Catch users that are not logged in
+  @UseMiddleware(isAuth)
   async createPost(
-    @Arg('title') title: string): Promise<Post> {
-      //* This is 2 SQL queries - 1 to save/ insert, the other to select it.
-    return Post.create({ title }).save()
+    @Arg('input') input: PostInput,
+    @Ctx() { req }: MyContext
+  ): Promise<Post> {
+    return Post.create({
+      ...input,
+      originalPosterId: req.session.userId
+    }).save()
   }
 
   //* Edit a post

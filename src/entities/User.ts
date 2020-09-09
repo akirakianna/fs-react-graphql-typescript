@@ -1,5 +1,6 @@
 import { ObjectType, Field } from "type-graphql";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, BaseEntity } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, BaseEntity, OneToMany } from "typeorm";
+import { Post } from "./Post";
 
 //* Creating entitites with TypeORM
 
@@ -10,14 +11,6 @@ export class User extends BaseEntity {
   @PrimaryGeneratedColumn()
   id!: number
   
-  @Field(() => String)
-  @CreateDateColumn()
-  createdAt: Date
-
-  @Field(() => String)
-  @UpdateDateColumn()
-  updatedAt: Date
-  
   @Field()
   @Column({ unique: true })
   username!: string
@@ -26,9 +19,20 @@ export class User extends BaseEntity {
   @Column({ unique: true })
   email!: string
 
-  //* By removing @Field means it can't be selected, will be a hash pw and only being created as a db column.
+  //* By removing @Field means it can't be selected (by GraphQL ?), will be a hash pw and only being created as a db column.
   @Column()
   password!: string
+
+  @OneToMany(() => Post, (post) => post.originalPosterId)
+  posts: Post[]
+
+  @Field(() => String)
+  @CreateDateColumn()
+  createdAt: Date
+
+  @Field(() => String)
+  @UpdateDateColumn()
+  updatedAt: Date
 }
 
 //* MikroORM

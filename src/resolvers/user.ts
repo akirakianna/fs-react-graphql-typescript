@@ -150,7 +150,9 @@ export class UserResolver {
     const hashedPassword = await argon2.hash(options.password)
     let user
     try {
-      //* Using TypeORM's query builder to insert a user and returning the user back.
+      // pass in username, email, pw
+      // User.create({}).save()
+      //* Using TypeORM's query (SQL) builder to insert a user and returning the user back.
       const result = await getConnection()
       .createQueryBuilder()
       .insert()
