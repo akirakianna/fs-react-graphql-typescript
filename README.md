@@ -206,3 +206,30 @@ Between entities.
 Post entity -
 Setting up a many-to-one : a single user can post many posts.
 
+
+Add create post form validation.
+
+// CREATING GLOBAL ERROR FOR PROJECT
+https://github.com/formidablelabs/urql/issues/225
+createUrqlClient.ts
+
+
+-- CUSTOM HOOK --
+useIsAuth
+Split the code out into its own hook so I can use wherever I want to make sure the user is logged in and has access to that page.
+
+
+--- token.tsx ---
+using query parameters - chnaged some code in token.tsx file.
+const response = await changePassword({
+            newPassword: values.newPassword,
+            token: 
+            // Getting the token this way allowed me to remove getInitialProps function below
+            typeof router.query.token === 'string' ? router.query.token : ''
+          })
+          better to use router.query.token
+is better than using getInitialProps as gip, next.js if some pages don't use gip, it will make the page static and optimize it.
+if you did need to ssr the page based off of a query param then you would use gip.
+
+
+-- Adding pagination --
