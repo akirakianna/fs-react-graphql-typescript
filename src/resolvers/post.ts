@@ -41,16 +41,21 @@ export class PostResolver {
     // setting a max limit
     const realLimit = Math.min(50, limit)
     //* Using TypeORM Select query builder instead of Post.find() as more complex.
-    return ( getConnection()
+    const qb = getConnection()
     .getRepository(Post)
     .createQueryBuilder("p")
-    .where('"createdAt" > :cursor', { cursor })
     //* Can add second param (ascending, descending)
     .orderBy('"createdAt"', "DESC")
     // there is a limit method in typeorm but the docs recommend using take when doing pagination
     .take(realLimit)
-    .getMany()
-   )
+    if (cursor) {
+     qb.where('"createdAt" < :cursor', { 
+       // turn ms (epoch) into date before passing to postgreSQL
+       cursor: new Date(parseInt(cursor))
+     })
+   }
+
+   return qb.getMany()
   }
 
   //* Get a single post by id

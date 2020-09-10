@@ -43,13 +43,17 @@ let PostResolver = class PostResolver {
     posts(limit, cursor) {
         return __awaiter(this, void 0, void 0, function* () {
             const realLimit = Math.min(50, limit);
-            return (typeorm_1.getConnection()
+            const qb = typeorm_1.getConnection()
                 .getRepository(Post_1.Post)
                 .createQueryBuilder("p")
-                .where('"createdAt" > :cursor', { cursor })
                 .orderBy('"createdAt"', "DESC")
-                .take(realLimit)
-                .getMany());
+                .take(realLimit);
+            if (cursor) {
+                qb.where('"createdAt" < :cursor', {
+                    cursor: new Date(parseInt(cursor))
+                });
+            }
+            return qb.getMany();
         });
     }
     post(id) {
