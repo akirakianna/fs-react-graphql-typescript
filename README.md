@@ -261,3 +261,8 @@ index.ts:
 
 --- bug with sql ----
 needs to have "" around it or else it doesn't read the Uppercase characters
+
+
+-- tips --
+//* limit amount of text shown for larger posts
+<Text mt={4}>{p.text.slice(0, 50)}</Text>

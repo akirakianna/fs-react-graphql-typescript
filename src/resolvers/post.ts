@@ -7,7 +7,9 @@ import {
   Field,
   Ctx,
   UseMiddleware,
-  Int
+  Int,
+  FieldResolver,
+  Root
 } from 'type-graphql'
 import { Post } from '../entities/Post'
 import { MyContext } from 'src/types'
@@ -25,8 +27,15 @@ class PostInput {
   text: string
 }
 
-@Resolver()
+// say what resolving
+@Resolver(Post)
 export class PostResolver {
+  //! not in our db, created then sent to client
+  @FieldResolver(() => String)
+  textSnippet(@Root() root: Post) {
+    //* limit amount of text shown for larger posts
+    return root.text.slice(0, 50)
+  }
 
   //* Return all posts
   @Query(() => [Post])
