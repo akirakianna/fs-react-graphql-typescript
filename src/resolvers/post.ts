@@ -6,7 +6,8 @@ import {
   InputType,
   Field,
   Ctx,
-  UseMiddleware
+  UseMiddleware,
+  Int
 } from 'type-graphql'
 import { Post } from '../entities/Post'
 import { MyContext } from 'src/types'
@@ -32,7 +33,7 @@ export class PostResolver {
   // adding cursor based pagination, uses location - e.g I want all posts after this point.
   // need to pick your cursor based on how you are sorting your list, e.g new.
   async posts(
-    @Arg('limit') limit: number,
+    @Arg('limit', () => Int) limit: number,
     // string will be a date that the posts are created
     //! The very first time we use fetch posts we're not going to have the cursor 
     //! so need to make it nullable (and explicitly set the type)
@@ -43,9 +44,9 @@ export class PostResolver {
     //* Using TypeORM Select query builder instead of Post.find() as more complex.
     const qb = getConnection()
     .getRepository(Post)
-    .createQueryBuilder("p")
+    .createQueryBuilder('p')
     //* Can add second param (ascending, descending)
-    .orderBy('"createdAt"', "DESC")
+    .orderBy('"createdAt"', 'DESC')
     // there is a limit method in typeorm but the docs recommend using take when doing pagination
     .take(realLimit)
     if (cursor) {

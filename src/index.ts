@@ -13,8 +13,9 @@ import cors from 'cors'
 import { User } from './entities/User'
 import { createConnection } from 'typeorm'
 import { Post } from './entities/Post'
+import path from 'path'
 
-
+// rerun
 //* TypeORM setup.
 
 const main = async () => {
@@ -26,8 +27,11 @@ const main = async () => {
     logging: true,
     //* will create the tables automatically for you
     synchronize: true,
+    //* pass in string of migration location
+    migrations: [path.join(__dirname, './migrations/*')],
     entities: [Post, User]
   })
+  await conn.runMigrations()
   
   // await Post.delete({})
 
